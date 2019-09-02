@@ -4,7 +4,7 @@
 var defaultStyle = {
    stroke: true,
    color: "#03f",
-   weight: 5,
+   weight: 1,
    opacity: 1,
    fillOpacity: 1,
    fillColor: '#03f',
@@ -15,7 +15,10 @@ var defaultStyle = {
    dashArray: null,
    lineJoin: null,
    lineCap: null,
+
 };
+
+var type;
 
 // attributes converted to numeric values
 var numericAttributes = ['weight', 'opacity', 'fillOpacity', 'strokeOpacity'];
@@ -32,7 +35,9 @@ var attributeNameMapping = {
    //strokeDashstyle,
    //pointRadius,
    'stroke-linejoin': 'lineJoin',
-   'stroke-linecap': 'lineCap'
+   'stroke-linecap': 'lineCap',
+   // NH
+   'size': 'radius'
 };
 
 // mapping SLD operators to shortforms
@@ -56,6 +61,7 @@ var namespaceMapping = {
 };
 
 function getTagNameArray(element, tagName, childrens) {
+
    var tagParts = tagName.split(':');
    var ns = null;
    var tags;
@@ -84,21 +90,43 @@ function getTagNameArray(element, tagName, childrens) {
       return tags;
 };
 
+
+
 /**
  * SLD Styler. Reads SLD 1.1.0.
  *
  */
 L.SLDStyler = L.Class.extend({
    // none yet
+   //type: null,
    options: {
+      type: this.type
    },
    initialize: function(sldStringOrXml, options) {
       L.Util.setOptions(this, options);
       if (sldStringOrXml !== undefined) {
          this.featureTypeStylesNameMap = {};
          this.featureTypeStyles = this.parse(sldStringOrXml);
+         //this.type = this.determineType(sldStringOrXml);
       }
    },
+
+   //determineType: function(sldStringOrXml) {
+   //   var x = sldStringOrXml;
+   //   if (x.includes('Line')) {
+   //      console.log('Line')
+   //      type = 'Line'
+   //   } else if (x.includes('Polygon')) {
+   //      console.log('Polygon')
+   //      type = 'Polygon'
+   //   } else if (x.includes('Point')) {
+   //      console.log('Point')
+   //      type = 'Point'
+   //   }
+   //   return type
+   //},
+
+   
 
    // translates PolygonSymbolizer attributes into Path attributes
    parseSymbolizer: function(symbolizer) {
@@ -151,9 +179,19 @@ L.SLDStyler = L.Class.extend({
          return filterJson;
       }
    },
-   parseRule: function(rule) {
+   parseRule: function(rule, xmlDoc) {
       var filter = getTagNameArray(rule, 'ogc:Filter')[0];
-      var symbolizer = getTagNameArray(rule, 'se:PolygonSymbolizer')[0];
+      var symbolizer;
+      console.log(typeof this.options.type) // Line
+
+      if (this.options.type === 'Polygon') {
+         symbolizer = getTagNameArray(rule, 'se:PolygonSymbolizer')[0]; // NH this is why it was failing
+      } else if (this.options.type === 'Line') {
+         symbolizer = getTagNameArray(rule, 'se:LineSymbolizer')[0];
+      } else if (this.options.type === 'Point') {
+         symbolizer = getTagNameArray(rule, 'se:PointSymbolizer')[0];
+      }
+
       return {
          filter: this.parseFilter(filter),
          symbolizer: this.parseSymbolizer(symbolizer)
@@ -164,6 +202,7 @@ L.SLDStyler = L.Class.extend({
       var self = this;
 
       if (typeof(sldStringOrXml) === 'string') {
+         console.log("NH1")
          var parser = new DOMParser();
          xmlDoc = parser.parseFromString(sldStringOrXml, "text/xml");
       }
@@ -202,7 +241,7 @@ L.SLDStyler = L.Class.extend({
          return {
             'name' : name,
             'rules': rules.map(function(rule) {
-               return this.parseRule(rule);
+               return this.parseRule(rule, xmlDoc);
             }, this)
          };
       }, this);
@@ -276,10 +315,21 @@ L.SLDStyler = L.Class.extend({
 
       return {};
    },
+
+   getAttributes: function() {
+      //console.log(this)
+      //console.log(getTagNameArray)
+      //console.log(this.featureTypeStyles)
+      //console.log(this.xmlDoc)
+
+   },
    getStyleFunction: function (indexOrName) {
       return this.styleFn.bind(this, indexOrName);
-   }
+   },
+
+   
 });
+
 
 L.SLDStyler.defaultStyle = defaultStyle;
 
